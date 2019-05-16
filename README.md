@@ -111,6 +111,10 @@ void *thread_routine(void *arg)
         //未取到有效任务
         while (task == nullptr)
         {
+            if (pool->quit)
+            {
+                break;
+            }
             //获取从当前时间，并加上等待时间， 设置进程的超时睡眠时间
             clock_gettime(CLOCK_REALTIME, &abstime);
             //等待10秒钟
@@ -123,10 +127,6 @@ void *thread_routine(void *arg)
                 timeout = 1;
                 break;
             } else {
-                //被主线程唤醒进行退出操作
-                if (pool->quit) {
-                    break;
-                }
                 //被唤醒，重新获取一次任务
                 task = PopTask(pool->task_pool);
             }
