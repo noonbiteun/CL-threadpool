@@ -119,5 +119,4 @@ void CleanTaskPool(TaskPool *pool)
     }
 }
 
-
 #endif // TASK_POOL_H_

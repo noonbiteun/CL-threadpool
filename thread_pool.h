@@ -43,6 +43,10 @@ void *thread_routine(void *arg)
         //未取到有效任务
         while (task == nullptr)
         {
+            if (pool->quit)
+            {
+                break;
+            }
             //获取从当前时间，并加上等待时间， 设置进程的超时睡眠时间
             clock_gettime(CLOCK_REALTIME, &abstime);
             //等待10秒钟
@@ -55,10 +59,6 @@ void *thread_routine(void *arg)
                 timeout = 1;
                 break;
             } else {
-                //被主线程唤醒进行退出操作
-                if (pool->quit) {
-                    break;
-                }
                 //被唤醒，重新获取一次任务
                 task = PopTask(pool->task_pool);
             }
@@ -124,6 +124,11 @@ void ThreadPoolInit(ThreadPool *pool, int threads)
 //增加一个任务到线程池
 bool ThreadPoolAddTask(ThreadPool *pool, char *category, void *(*run)(void *arg), void *arg)
 {
+    //已调用销毁，不可再添加
+    if (pool->quit)
+    {
+        return false;
+    }
     //产生一个新的任务
     Task *newtask = new Task();
     newtask->category = category;
@@ -145,6 +150,22 @@ bool ThreadPoolAddTask(ThreadPool *pool, char *category, void *(*run)(void *arg)
         pthread_create(&tid, NULL, thread_routine, pool);
         pthread_detach(tid);
         pool->counter++;
+    }
+
+    //解锁
+    ConditionUnlock(&pool->ready);
+    return true;
+}
+
+//清空所有任务
+void ThreadPoolCleanTask(ThreadPool *pool)
+{
+    //线程池的状态被多个线程共享，操作前需要加锁
+    ConditionLock(&pool->ready);
+
+    if (pool && pool->task_pool)
+    {
+        CleanTaskPool(pool->task_pool);
     }
 
     //解锁
@@ -176,7 +197,6 @@ void ThreadPoolDestroy(ThreadPool *pool)
     }
     ConditionUnlock(&pool->ready);
     ConditionDestroy(&pool->ready);
-    CleanTaskPool(pool->task_pool);
 }
 
 #endif // THREAD_POOL_H_
